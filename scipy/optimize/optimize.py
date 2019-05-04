@@ -2568,7 +2568,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         wo_bar = wo_bar_vec[0]  # np.zeros_like(wk)
         ws = ws_vec[0]  # 0
         vk = vk_vec[0]  # 0
-    mu = 0.85
+    mu = 0.8
     func_calls, f = wrap_function(f, args)
     if fprime is None:
         grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
@@ -2653,7 +2653,10 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
     ws_vec.append(ws)  # 0
     vk_vec.append(vk)  # 0
 
-    result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
+    try:
+           result = OptimizeResult( x=wk)
+    except: 
+           result = OptimizeResult(fun=1, jac=0, hess_inv=0, nfev=0,
                             njev=0, status=0,
                             success=(0), message=0, x=wk,
                             nit=k)
