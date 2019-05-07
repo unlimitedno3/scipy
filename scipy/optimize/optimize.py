@@ -2400,9 +2400,9 @@ def _minimize_bfgs(fun, x0, args=(), jac=None, callback=None,
 #######################################################################################################################
 
 def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
-                    gtol=1e-5, norm=Inf, eps=_epsilon, maxiter=None,
-                    disp=False, return_all=False, wo_bar_vec=None, ws_vec=None,
-                    iter=None, alpha_k=1.0, sk_vec=None, yk_vec=None, F=None, t_vec=None,
+                    gtol=1e-5, norm=Inf, eps=1e-4, maxiter=None,
+                    disp=False, return_all=False, wo_bar_vec=None, ws_vec=None,gamma = 1.01,
+                    iter=None, alpha_k=1.0, sk_vec=None, yk_vec=None, F=None, t_vec=None,L=5,
                     **unknown_options):
     """
     Bk = minibatch
@@ -2426,9 +2426,8 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
 
     t = t_vec[0]
     k = iter[0]
-    L = 5
-    eps = 1e-4
-    gamma = 1.01
+    #eps = 1e-4
+    #gamma = 1.01
     N = len(wk)
 
     if k == 0:
@@ -2445,6 +2444,7 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
         grad_calls, myfprime = wrap_function(fprime, args)
 
     gfk = myfprime(wk).reshape(-1, 1)
+
     F.append(gfk)
     ws = ws + wk
 
@@ -2486,6 +2486,7 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
 
     wk = wk - alpha_k * pk
 
+
     if k % L == 0:
         wn_bar = ws / L
         ws = np.zeros_like(wk)
@@ -2504,7 +2505,7 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
                 # for i in F:
                 #    yk += np.dot(i,np.dot(i.T,sk))
                 # yk = yk/len(F)
-                if np.dot(yk.T, sk) > eps * np.dot(yk.T, yk):
+                if np.dot(sk.T, yk) > eps * np.dot(sk.T, sk):
                     sk_vec.append(sk)
                     yk_vec.append(yk)
                     wo_bar = wn_bar
@@ -2529,9 +2530,9 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
 
 
 def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
-                    gtol=1e-5, norm=Inf, eps=_epsilon, maxiter=None,
-                    disp=False, return_all=False, wo_bar_vec=None, ws_vec=None,vk_vec=None,
-                    iter=None, alpha_k=1.0, sk_vec=None, yk_vec=None, F=None, t_vec=None,
+                    gtol=1e-5, norm=Inf, eps=1e-4, maxiter=None,
+                    disp=False, return_all=False, wo_bar_vec=None, ws_vec=None,vk_vec=None,L=5,mu = 0.8,
+                    iter=None, alpha_k=1.0, sk_vec=None, yk_vec=None, F=None, t_vec=None, gamma = 1.01,
                     **unknown_options):
     """
     Bk = minibatch
@@ -2555,9 +2556,10 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
     t = t_vec[0]
     k = iter[0]
-    L = 5
-    eps = 1e-4
-    gamma = 1.01
+    #L = 5
+    #eps = 1e-4
+    #gamma = 1.01
+    #mu = 0.85
     N = len(wk)
 
     if k == 0:
@@ -2568,7 +2570,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         wo_bar = wo_bar_vec[0]  # np.zeros_like(wk)
         ws = ws_vec[0]  # 0
         vk = vk_vec[0]  # 0
-    mu = 0.8
+
     func_calls, f = wrap_function(f, args)
     if fprime is None:
         grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
@@ -2653,10 +2655,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
     ws_vec.append(ws)  # 0
     vk_vec.append(vk)  # 0
 
-    try:
-           result = OptimizeResult( x=wk)
-    except: 
-           result = OptimizeResult(fun=1, jac=0, hess_inv=0, nfev=0,
+    result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
                             njev=0, status=0,
                             success=(0), message=0, x=wk,
                             nit=k)
