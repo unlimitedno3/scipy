@@ -2505,7 +2505,7 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
                 # for i in F:
                 #    yk += np.dot(i,np.dot(i.T,sk))
                 # yk = yk/len(F)
-                if np.dot(sk.T, yk) > eps * np.dot(sk.T, sk):
+                if np.dot(sk.T, yk) > eps * np.dot(yk.T, yk):
                     sk_vec.append(sk)
                     yk_vec.append(yk)
                     wo_bar = wn_bar
@@ -2638,7 +2638,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
                 # for i in F:
                 #    yk += np.dot(i,np.dot(i.T,sk))
                 # yk = yk/len(F)
-                if np.dot(yk.T, sk) > eps * np.dot(yk.T, yk):
+                if np.dot(sk.T, yk) > eps * np.dot(yk.T, yk):
                     sk_vec.append(sk)
                     yk_vec.append(yk)
                     wo_bar = wn_bar
