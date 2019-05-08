@@ -2666,7 +2666,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
                     gtol=1e-5, norm=Inf, eps=1e-4, maxiter=None,
                     disp=False, return_all=False, wo_bar_vec=None, ws_vec=None,vk_vec=None,L=5,mu = 0.8,
-                    iter=None, alpha_k=1.0, sk_vec=None, yk_vec=None, F=None, t_vec=None, gamma = 1.01,
+                    iter=None, alpha_k=1.0, sk_vec=None, yk_vec=None, F=None, t_vec=None, gamma = 1.01,old_fun_val=None,
                     **unknown_options):
     """
     Bk = minibatch
@@ -2700,12 +2700,14 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         wo_bar = np.zeros_like(wk)
         ws = np.zeros_like(wk)
         vk = np.zeros_like(wk)
-        old_fun_val = None
+        old_val = None
+
 
     else:
         wo_bar = wo_bar_vec[0]  # np.zeros_like(wk)
         ws = ws_vec[0]  # 0
         vk = vk_vec[0]  # 0
+        old_val = old_fun_val[0]
 
     func_calls, f = wrap_function(f, args)
     if fprime is None:
@@ -2757,10 +2759,10 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
     wkp1 = wk + vk
     new_fun_val = f(wkp1)
 
-    if old_fun_val==None:
-        old_fun_val=new_fun_val
+    if old_val==None:
+        old_val = new_fun_val
 
-    if new_fun_val>2*old_fun_val or new_fun_val== np.nan or new_fun_val==np.inf:
+    if new_fun_val>2*old_val or new_fun_val== np.nan or new_fun_val==np.inf:
         mu = 0
         print("Reset mu")
         vk = mu * vk - alpha_k * pk
@@ -2770,7 +2772,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         mu = 0.8
         wk = wkp1
 
-    old_fun_val = new_fun_val
+    old_fun_val.append(new_fun_val)
 
     if k % L == 0:
         wn_bar = ws / L
