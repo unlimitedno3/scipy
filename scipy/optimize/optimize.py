@@ -2769,7 +2769,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         wk = wk + vk
 
     else:
-        mu = 0.8
+        #mu = 0.8
         wk = wkp1
 
     old_fun_val.append(new_fun_val)
