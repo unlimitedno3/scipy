@@ -2719,7 +2719,9 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
     else:
         grad_calls, myfprime = wrap_function(fprime, args)
 
-    gfk = myfprime(wk+mu*vk).reshape(-1, 1)
+    gfk = myfprime(wk).reshape(-1, 1)
+    #gfk = myfprime(wk+mu*vk).reshape(-1, 1)
+    
     F.append(gfk)
     ws = ws + wk
 
@@ -2791,7 +2793,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
                 mu = np.minimum(mu / mu_fac, mu_clip)
 
-                #F.clear()
+                F.clear()
                 #for ind in range(L): del F[-1]
                 print("Clearing buffers, mu val: ",mu_val[0])
                 wk = wo_bar
