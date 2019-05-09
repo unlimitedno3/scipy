@@ -2495,6 +2495,7 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
                 sk_vec.clear()
                 yk_vec.clear()
                 # F.clear()
+                print("Clearing buffers")
                 wk = wo_bar
                 flag_ret = 0
             if flag_ret:
@@ -2665,7 +2666,8 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 '''
 def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
                     gtol=1e-5, norm=Inf, eps=1e-4, maxiter=None,
-                    disp=False, return_all=False, wo_bar_vec=None, ws_vec=None,vk_vec=None,L=5,mu = 0.8,
+                    disp=False, return_all=False, wo_bar_vec=None, ws_vec=None,vk_vec=None,L=5,
+                    mu_val = None,mu_fac=1.01,mu_init = 0.1,mu_clip=0.99,
                     iter=None, alpha_k=1.0, sk_vec=None, yk_vec=None, F=None, t_vec=None, gamma = 1.01,old_fun_val=None,
                     **unknown_options):
     """
@@ -2701,6 +2703,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         ws = np.zeros_like(wk)
         vk = np.zeros_like(wk)
         old_val = None
+        mu = mu_init
 
 
     else:
@@ -2708,6 +2711,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         ws = ws_vec[0]  # 0
         vk = vk_vec[0]  # 0
         old_val = old_fun_val[0]
+        mu = mu_val[0]
 
     func_calls, f = wrap_function(f, args)
     if fprime is None:
@@ -2763,13 +2767,16 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         old_val = new_fun_val
 
     if new_fun_val>2*old_val or new_fun_val== np.nan or new_fun_val==np.inf:
-        mu = 0
+        #if new_fun_val==np.nan or new_fun_val==np.inf:
         print("Reset mu")
-        vk = mu * vk - alpha_k * pk
-        wk = wk + vk
+        mu = mu_init
+
+        #skip weight update (since pk uses E(wk+mu*vk)
+        #vk = mu * vk - alpha_k * pk
+        #wk = wk + vk
+        new_fun_val = old_val
 
     else:
-        #mu = 0.8
         wk = wkp1
 
     old_fun_val.append(new_fun_val)
@@ -2781,12 +2788,17 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
             if f(wn_bar) > gamma * f(wo_bar):
                 sk_vec.clear()
                 yk_vec.clear()
+
+                mu = np.minimum(mu / mu_fac, mu_clip)
+
                 #F.clear()
-                for ind in range(L): del F[-1]
-                print("Clearing buffers")
+                #for ind in range(L): del F[-1]
+                print("Clearing buffers, mu val: ",mu_val[0])
                 wk = wo_bar
                 flag_ret = 0
             if flag_ret:
+                mu = np.minimum(mu * mu_fac, mu_clip)
+
                 sk = wn_bar - wo_bar
                 fisher = np.asarray(F)[:, :, 0].T
                 yk = np.dot(fisher, np.dot(fisher.T, sk)) / len(F)
@@ -2798,6 +2810,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
                     sk_vec.append(sk)
                     yk_vec.append(yk)
                     wo_bar = wn_bar
+
         else:
             wo_bar = wn_bar
         t += 1
@@ -2807,6 +2820,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         callback(wk)
     k += 1
     iter.append(k)
+    mu_val.append(mu)
     wo_bar_vec.append(wo_bar)  # np.zeros_like(wk)
     ws_vec.append(ws)  # 0
     vk_vec.append(vk)  # 0
