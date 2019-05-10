@@ -2737,11 +2737,10 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
     else:
         grad_calls, myfprime = wrap_function(fprime, args)
 
-    gfk = myfprime(wk).reshape(-1, 1)
+    gfk = myfprime(wk+mu*vk).reshape(-1, 1)
 
-    F.append(gfk)
     ws = ws + wk+mu*vk
-
+    if k==0: F.append(gfk)
     # two loop recursion
 
     q = gfk
@@ -2759,6 +2758,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         beta = rho * np.dot(yk_vec[i].T, r)
         r = r + sk_vec[i] * (a[i] - beta)
     pk = r
+    if k==0:F.clear()
     '''
     pk = -gfk
     a = []
@@ -2780,6 +2780,8 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
     vk = mu*vk - alpha_k * pk
     wk = wk + vk
+    gfkp1 = myfprime(wk).reshape(-1, 1)
+    F.append(gfkp1)
 
     if k % L == 0:
         wn_bar = ws / L
@@ -2788,7 +2790,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
             if f(wn_bar) > gamma * f(wo_bar):
                 sk_vec.clear()
                 yk_vec.clear()
-                #mu = np.minimum(mu / mu_fac, mu_clip)
+                mu = np.minimum(mu / mu_fac, mu_clip)
                 if clearF: F.clear()
                 print("Clearing buffers")
                 wk = wo_bar
