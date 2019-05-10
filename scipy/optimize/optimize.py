@@ -2715,39 +2715,32 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
     t = t_vec[0]
     k = iter[0]
-    # L = 5
     # eps = 1e-4
     # gamma = 1.01
-    # mu = 0.85
     N = len(wk)
 
     if k == 0:
         wo_bar = np.zeros_like(wk)
         ws = np.zeros_like(wk)
         vk = np.zeros_like(wk)
-        old_val = None
         mu = mu_init
-
 
     else:
         wo_bar = wo_bar_vec[0]  # np.zeros_like(wk)
         ws = ws_vec[0]  # 0
+        mu = mu_val[0]  # 0
         vk = vk_vec[0]  # 0
-        old_val = old_fun_val[0]
-        mu = mu_val[0]
 
-    mu = 0.8
     func_calls, f = wrap_function(f, args)
     if fprime is None:
         grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
     else:
         grad_calls, myfprime = wrap_function(fprime, args)
 
-    #gfk = myfprime(wk).reshape(-1, 1)
-    gfk = myfprime(wk + mu * vk).reshape(-1, 1)
+    gfk = myfprime(wk).reshape(-1, 1)
 
     F.append(gfk)
-    ws = ws + wk
+    ws = ws + wk+mu*vk
 
     # two loop recursion
 
@@ -2766,7 +2759,6 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         beta = rho * np.dot(yk_vec[i].T, r)
         r = r + sk_vec[i] * (a[i] - beta)
     pk = r
-    if dirNorm: pk = pk / vecnorm(pk, 2)
     '''
     pk = -gfk
     a = []
@@ -2786,40 +2778,8 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
     flag_ret = 1
 
-    vkp1 = mu * vk - alpha_k * pk
-    wkp1 = wk + vk
-    new_fun_val = f(wkp1)
-
-    if old_val == None:
-        old_val = new_fun_val
-
-    '''
-    if new_fun_val > 5 * old_val or new_fun_val == np.nan or new_fun_val == np.inf:
-        if new_fun_val == np.nan or new_fun_val == np.inf:
-            print("gnorm :", vecnorm(gfk, 2))
-        print("Skipping ")
-
-        if reset:
-            print("Reset mu")
-            mu = mu_init
-        # skip weight update (since pk uses E(wk+mu*vk)
-        # vk = mu * vk - alpha_k * pk
-        # wk = wk + vk
-        # Remove E(wk+mu*vk) from fisher buffer
-        try:
-            del F[-1]
-        except:
-            pass
-        new_fun_val = old_val
-
-    else:
-        wk = wkp1
-        vk = vkp1
-        old_fun_val.append(new_fun_val)
-    '''
-    wk = wkp1
-    vk = vkp1
-    old_fun_val.append(new_fun_val)
+    vk = mu*vk - alpha_k * pk
+    wk = wk + vk
 
     if k % L == 0:
         wn_bar = ws / L
@@ -2828,23 +2788,17 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
             if f(wn_bar) > gamma * f(wo_bar):
                 sk_vec.clear()
                 yk_vec.clear()
-
-                mu = np.minimum(mu / mu_fac, mu_clip)
-
-                #if clearF:
-                F.clear()
-                # for ind in range(L): del F[-1]
-                print("Clearing buffers, mu val: ", mu_val[0])
+                #mu = np.minimum(mu / mu_fac, mu_clip)
+                if clearF: F.clear()
+                print("Clearing buffers")
                 wk = wo_bar
                 flag_ret = 0
             if flag_ret:
-                mu = np.minimum(mu * mu_fac, mu_clip)
-
                 sk = wn_bar - wo_bar
                 fisher = np.asarray(F)[:, :, 0].T
                 yk = np.dot(fisher, np.dot(fisher.T, sk))
-                #yk = np.dot(np.sum(fisher,1,keepdims=True)).T , sk) / shape(fisher)[-1]
-                #yk = (np.sum(fisher,1,keepdims=True)* sk)/shape(fisher)[-1]
+                mu = np.minimum(mu * mu_fac, mu_clip)
+                # yk = (np.sum(fisher, 1, keepdims=True) * sk) / shape(fisher)[-1]
                 # yk = 0
                 # for i in F:
                 #    yk += np.dot(i,np.dot(i.T,sk))
@@ -2853,7 +2807,6 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
                     sk_vec.append(sk)
                     yk_vec.append(yk)
                     wo_bar = wn_bar
-
         else:
             wo_bar = wn_bar
         t += 1
@@ -2868,7 +2821,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
     ws_vec.append(ws)  # 0
     vk_vec.append(vk)  # 0
 
-    result = OptimizeResult(fun=old_fun_val, jac=0, hess_inv=0, nfev=0,
+    result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
                             njev=0, status=0,
                             success=(0), message=0, x=wk,
                             nit=k)
