@@ -2520,8 +2520,8 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
             if flag_ret:
                 sk = wn_bar - wo_bar
                 fisher = np.asarray(F)[:, :, 0].T
-                #yk = np.dot(fisher, np.dot(fisher.T, sk)) / len(F)
-                yk = (np.sum(fisher, 1, keepdims=True) * sk) / shape(fisher)[-1]
+                yk = np.dot(fisher, np.dot(fisher.T, sk))
+                #yk = (np.sum(fisher, 1, keepdims=True) * sk) / shape(fisher)[-1]
                 # yk = 0
                 # for i in F:
                 #    yk += np.dot(i,np.dot(i.T,sk))
@@ -2736,6 +2736,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         old_val = old_fun_val[0]
         mu = mu_val[0]
 
+    mu = 0.8
     func_calls, f = wrap_function(f, args)
     if fprime is None:
         grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
@@ -2792,6 +2793,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
     if old_val == None:
         old_val = new_fun_val
 
+    '''
     if new_fun_val > 5 * old_val or new_fun_val == np.nan or new_fun_val == np.inf:
         if new_fun_val == np.nan or new_fun_val == np.inf:
             print("gnorm :", vecnorm(gfk, 2))
@@ -2814,6 +2816,10 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         wk = wkp1
         vk = vkp1
         old_fun_val.append(new_fun_val)
+    '''
+    wk = wkp1
+    vk = vkp1
+    old_fun_val.append(new_fun_val)
 
     if k % L == 0:
         wn_bar = ws / L
@@ -2825,7 +2831,8 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
                 mu = np.minimum(mu / mu_fac, mu_clip)
 
-                if clearF: F.clear()
+                #if clearF:
+                F.clear()
                 # for ind in range(L): del F[-1]
                 print("Clearing buffers, mu val: ", mu_val[0])
                 wk = wo_bar
@@ -2835,9 +2842,9 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
                 sk = wn_bar - wo_bar
                 fisher = np.asarray(F)[:, :, 0].T
-                #yk = np.dot(fisher, np.dot(fisher.T, sk)) / len(F)
+                yk = np.dot(fisher, np.dot(fisher.T, sk))
                 #yk = np.dot(np.sum(fisher,1,keepdims=True)).T , sk) / shape(fisher)[-1]
-                yk = (np.sum(fisher,1,keepdims=True)* sk)/shape(fisher)[-1]
+                #yk = (np.sum(fisher,1,keepdims=True)* sk)/shape(fisher)[-1]
                 # yk = 0
                 # for i in F:
                 #    yk += np.dot(i,np.dot(i.T,sk))
