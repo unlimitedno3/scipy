@@ -2401,7 +2401,7 @@ def _minimize_bfgs(fun, x0, args=(), jac=None, callback=None,
 
 def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
                     gtol=1e-5, norm=Inf, eps=1e-4, maxiter=None,
-                    disp=False, return_all=False, wo_bar_vec=None, ws_vec=None,gamma = 1.01,
+                    disp=False, return_all=False, wo_bar_vec=None, ws_vec=None,gamma = 1.01,clearF=True,
                     iter=None, alpha_k=1.0, sk_vec=None, yk_vec=None, F=None, t_vec=None,L=5,
                     **unknown_options):
     """
@@ -2454,14 +2454,14 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
     tau = len(sk_vec)
     a = np.zeros(tau)
     for i in reversed(range(tau)):
-        rho = numpy.dot(yk_vec[i].T, sk_vec[i])
+        rho = 1/numpy.dot(yk_vec[i].T, sk_vec[i])
         a[i] = rho * np.dot(sk_vec[i].T, q)
         q = q - np.dot(a[i], yk_vec[i])
     term = np.sum(np.square(F), 0)
     Hk0 = 1 / np.sqrt(term + eps)
     r = Hk0 * q
     for i in range(tau):
-        rho = numpy.dot(yk_vec[i].T, sk_vec[i])
+        rho = 1/numpy.dot(yk_vec[i].T, sk_vec[i])
         beta = rho * np.dot(yk_vec[i].T, r)
         r = r + sk_vec[i] * (a[i] - beta)
     pk = r
@@ -2494,7 +2494,7 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
             if f(wn_bar) > gamma * f(wo_bar):
                 sk_vec.clear()
                 yk_vec.clear()
-                # F.clear()
+                if clearF: F.clear()
                 print("Clearing buffers")
                 wk = wo_bar
                 flag_ret = 0
@@ -2667,7 +2667,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
                     gtol=1e-5, norm=Inf, eps=1e-4, maxiter=None,
                     disp=False, return_all=False, wo_bar_vec=None, ws_vec=None,vk_vec=None,L=5,
-                    mu_val = None,mu_fac=1.01,mu_init = 0.1,mu_clip=0.99,
+                    mu_val = None,mu_fac=1.01,mu_init = 0.1,mu_clip=0.99,clearF=True, reset=False, dirNorm = False,
                     iter=None, alpha_k=1.0, sk_vec=None, yk_vec=None, F=None, t_vec=None, gamma = 1.01,old_fun_val=None,
                     **unknown_options):
     """
@@ -2720,7 +2720,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         grad_calls, myfprime = wrap_function(fprime, args)
 
     gfk = myfprime(wk).reshape(-1, 1)
-    #gfk = myfprime(wk+mu*vk).reshape(-1, 1)
+    gfk = myfprime(wk+mu*vk).reshape(-1, 1)
     
     F.append(gfk)
     ws = ws + wk
@@ -2731,17 +2731,18 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
     tau = len(sk_vec)
     a = np.zeros(tau)
     for i in reversed(range(tau)):
-        rho = numpy.dot(yk_vec[i].T, sk_vec[i])
+        rho = 1/numpy.dot(yk_vec[i].T, sk_vec[i])
         a[i] = rho * np.dot(sk_vec[i].T, q)
         q = q - np.dot(a[i], yk_vec[i])
     term = np.sum(np.square(F), 0)
     Hk0 = 1 / np.sqrt(term + eps)
     r = Hk0 * q
     for i in range(tau):
-        rho = numpy.dot(yk_vec[i].T, sk_vec[i])
+        rho = 1/numpy.dot(yk_vec[i].T, sk_vec[i])
         beta = rho * np.dot(yk_vec[i].T, r)
         r = r + sk_vec[i] * (a[i] - beta)
     pk = r
+    if dirNorm:pk=pk/vecnorm(pk,2)
     '''
     pk = -gfk
     a = []
@@ -2761,27 +2762,33 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
     flag_ret = 1
 
-    vk = mu*vk - alpha_k * pk
+    vkp1 = mu*vk - alpha_k * pk
     wkp1 = wk + vk
     new_fun_val = f(wkp1)
 
     if old_val==None:
         old_val = new_fun_val
 
-    if new_fun_val>2*old_val or new_fun_val== np.nan or new_fun_val==np.inf:
-        #if new_fun_val==np.nan or new_fun_val==np.inf:
-        print("Reset mu")
-        mu = mu_init
-
+    if new_fun_val>5*old_val or new_fun_val== np.nan or new_fun_val==np.inf:
+        if new_fun_val==np.nan or new_fun_val==np.inf:
+           print ("gnorm :", vecnorm(gfk, 2) )
+        print("Skipping ")
+        
+        if reset:
+           print("Reset mu")
+           mu = mu_init
         #skip weight update (since pk uses E(wk+mu*vk)
         #vk = mu * vk - alpha_k * pk
         #wk = wk + vk
+        #Remove E(wk+mu*vk) from fisher buffer
+        try:del F[-1]
+        except: pass
         new_fun_val = old_val
 
     else:
         wk = wkp1
-
-    old_fun_val.append(new_fun_val)
+        vk = vkp1
+        old_fun_val.append(new_fun_val)
 
     if k % L == 0:
         wn_bar = ws / L
@@ -2793,7 +2800,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
                 mu = np.minimum(mu / mu_fac, mu_clip)
 
-                F.clear()
+                if clearF: F.clear()
                 #for ind in range(L): del F[-1]
                 print("Clearing buffers, mu val: ",mu_val[0])
                 wk = wo_bar
