@@ -2532,6 +2532,7 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
                 wk = wo_bar
                 vk = vo_bar
                 mu = np.minimum(mu / mu_fac, mu_clip)
+                mu = np.maximum(mu, mu_init)
                 flag_ret = 0
             if flag_ret:
                 sk = wn_bar - wo_bar
@@ -2822,6 +2823,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
                 sk_vec.clear()
                 yk_vec.clear()
                 mu = np.minimum(mu / mu_fac, mu_clip)
+                mu = np.maximum(mu,mu_init)
                 if clearF: F.clear()
                 print("Clearing buffers")
                 wk = wo_bar
