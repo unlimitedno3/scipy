@@ -2714,7 +2714,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
                      gtol=1e-5, norm=Inf, eps=1e-4, maxiter=None,
                      disp=False, return_all=False, wo_bar_vec=None, ws_vec=None,vo_bar_vec=None, vs_vec=None, vk_vec=None, L=5,
-                     mu_val=None, mu_fac=1.01, mu_init=0.1, mu_clip=0.99, clearF=True, reset=False, dirNorm=False,
+                     mu_val=None, mu_fac=1.01, mu_init=0.1, mu_clip=0.99, clearF=True, reset=False, dirNorm=True,
                      iter=None, alpha_k=1.0, sk_vec=None, yk_vec=None, F=None, t_vec=None, gamma=1.01, old_fun_val=None,
                      **unknown_options):
     """
@@ -2788,6 +2788,13 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
         beta = rho * np.dot(yk_vec[i].T, r)
         r = r + sk_vec[i] * (a[i] - beta)
     pk = r
+    if vecnorm(pk,2) == np.inf or vecnorm(pk,2) == np.nan:
+        pk = np.ones_like(wk)
+
+    elif dirNorm:
+        pk = pk/vecnorm(pk,2) #Exploding gradients (direction normalization)
+
+
     if k==0:F.clear()
     '''
     pk = -gfk
