@@ -2419,6 +2419,143 @@ def _minimize_bfgs(fun, x0, args=(), jac=None, callback=None,
 
 #######################################################################################################################
 
+
+def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
+                    gtol=1e-5, norm=Inf, eps=1e-4, maxiter=None,
+                    disp=False, return_all=False, wo_bar_vec=None, ws_vec=None, gamma=1.01, clearF=True,
+                    iter=None, alpha_k=0.01, sk_vec=None, yk_vec=None, F=None, t_vec=None, L=5,
+                    **unknown_options):
+    """
+    Bk = minibatch
+    |Bk| = b batch size
+    L = 5 memory size chosen from (2,5,10,20)
+    alpha = ?
+    k = iteration count
+    mL = 10
+    mF = 100
+    eps =1e-4
+    gamma = 1.01
+    """
+    _check_unknown_options(unknown_options)
+    f = fun
+    fprime = jac
+    epsilon = eps
+    retall = return_all
+
+    x0 = asarray(x0).flatten()
+    wk = x0.reshape(-1, 1)
+
+    t = t_vec[0]
+    k = iter[0]
+    # eps = 1e-4
+    # gamma = 1.01
+    N = len(wk)
+
+    if k == 0:
+        wo_bar = np.zeros_like(wk)
+        ws = np.zeros_like(wk)
+    else:
+        wo_bar = wo_bar_vec[0]  # np.zeros_like(wk)
+        ws = ws_vec[0]  # 0
+
+    func_calls, f = wrap_function(f, args)
+    if fprime is None:
+        grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
+    else:
+        grad_calls, myfprime = wrap_function(fprime, args)
+
+    gfk = myfprime(wk).reshape(-1, 1)
+
+    F.append(gfk)
+    ws = ws + wk
+
+    # two loop recursion
+
+    q = gfk
+    tau = len(sk_vec)
+    a = np.zeros(tau)
+    for i in reversed(range(tau)):
+        rho = 1 / numpy.dot(yk_vec[i].T, sk_vec[i])
+        a[i] = rho * np.dot(sk_vec[i].T, q)
+        q = q - np.dot(a[i], yk_vec[i])
+    term = np.sum(np.square(F), 0)
+    Hk0 = 1 / np.sqrt(term + eps)
+    r = Hk0 * q
+    for i in range(tau):
+        rho = 1 / numpy.dot(yk_vec[i].T, sk_vec[i])
+        beta = rho * np.dot(yk_vec[i].T, r)
+        r = r + sk_vec[i] * (a[i] - beta)
+    pk = r
+    """
+    pk = -gfk
+    a = []
+
+    idx = len(sk_vec)
+    for i in range(len(sk_vec)):
+        a.append(numpy.dot(sk_vec[idx - 1 - i].T, pk) / numpy.dot(sk_vec[idx - 1 - i].T, yk_vec[idx - 1 - i]))
+        pk = pk - a[i] * yk_vec[idx - 1 - i]
+
+    term = np.sum(np.square(F), 0)
+    Hk0 = 1 / np.sqrt(term + eps)
+    pk = Hk0 * pk
+    for i in reversed(range(len(sk_vec))):
+        b = numpy.dot(yk_vec[idx - 1 - i].T, pk) / numpy.dot(yk_vec[idx - 1 - i].T, sk_vec[idx - 1 - i])
+        pk = pk + (a[i] - b) * sk_vec[idx - 1 - i]
+    """
+
+    flag_ret = 1
+
+    wk = wk - alpha_k * pk
+
+    if k % L == 0:
+        wn_bar = ws / L
+        ws = np.zeros_like(wk)
+        if t > 0:
+            if f(wn_bar) > gamma * f(wo_bar):
+                sk_vec.clear()
+                yk_vec.clear()
+                if clearF: F.clear()
+                print("Clearing buffers")
+                wk = wo_bar
+                flag_ret = 0
+            if flag_ret:
+                sk = wn_bar - wo_bar
+                fisher = np.asarray(F)[:, :, 0].T
+                yk = np.dot(fisher, np.dot(fisher.T, sk))
+                #yk = (np.sum(fisher, 1, keepdims=True) * sk) / shape(fisher)[-1]
+                # yk = 0
+                # for i in F:
+                #    yk += np.dot(i,np.dot(i.T,sk))
+                # yk = yk/len(F)
+                if np.dot(sk.T, yk) > eps * np.dot(yk.T, yk):
+                    sk_vec.append(sk)
+                    yk_vec.append(yk)
+                    wo_bar = wn_bar
+
+        else:
+            wo_bar = wn_bar
+
+        t += 1
+        t_vec.append(t)
+
+    if callback is not None:
+        callback(wk)
+    k += 1
+    iter.append(k)
+    wo_bar_vec.append(wo_bar)  # np.zeros_like(wk)
+    ws_vec.append(ws)  # 0
+
+    result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
+                            njev=0, status=0,
+                            success=(0), message=0, x=wk,
+                            nit=k)
+
+    return result
+
+
+
+'''
+# adaQN with momentum
 def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
                     gtol=1e-5, norm=Inf, eps=1e-4, maxiter=None,
                     disp=False, return_all=False, wo_bar_vec=None,vo_bar_vec=None, ws_vec=None,vs_vec=None, gamma=1.01, clearF=True,
@@ -2495,7 +2632,7 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
         beta = rho * np.dot(yk_vec[i].T, r)
         r = r + sk_vec[i] * (a[i] - beta)
     pk = r
-    '''
+    """
     pk = -gfk
     a = []
 
@@ -2510,7 +2647,7 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
     for i in reversed(range(len(sk_vec))):
         b = numpy.dot(yk_vec[idx - 1 - i].T, pk) / numpy.dot(yk_vec[idx - 1 - i].T, sk_vec[idx - 1 - i])
         pk = pk + (a[i] - b) * sk_vec[idx - 1 - i]
-    '''
+    """
 
     flag_ret = 1
 
@@ -2572,6 +2709,8 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
                             nit=k)
 
     return result
+
+'''
 
 
 '''
