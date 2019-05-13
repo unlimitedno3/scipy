@@ -2467,7 +2467,7 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
     gfk = myfprime(wk).reshape(-1, 1)
 
     F.append(gfk)
-    ws = ws + wk
+
 
     # two loop recursion
 
@@ -2506,6 +2506,8 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
     flag_ret = 1
 
     wk = wk - alpha_k * pk
+
+    ws = ws + wk
 
     if k % L == 0:
         wn_bar = ws / L
@@ -2712,7 +2714,6 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
 
 '''
 
-
 '''
 def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
                     gtol=1e-5, norm=Inf, eps=1e-4, maxiter=None,
@@ -2906,9 +2907,6 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
     gfk = myfprime(wk+mu*vk).reshape(-1, 1)
 
-    ws = ws + wk#+mu*vk
-    vs = vs + vk
-
     if k==0: F.append(gfk)
     # two loop recursion
 
@@ -2956,12 +2954,18 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
     vk = mu*vk - alpha_k * pk
     wk = wk + vk
+
+    ws = ws + wk  # +mu*vk
+    vs = vs + vk
+    
     gfkp1 = myfprime(wk).reshape(-1, 1)
     F.append(gfkp1)
+    
+    
 
     if k % L == 0:
         wn_bar = ws / L
-        vn_bar = ws / L
+        vn_bar = vs / L
         ws = np.zeros_like(wk)
         vs = np.zeros_like(wk)
         if t > 0:
