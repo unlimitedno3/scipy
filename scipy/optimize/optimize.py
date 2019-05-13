@@ -2421,8 +2421,9 @@ def _minimize_bfgs(fun, x0, args=(), jac=None, callback=None,
 
 def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
                     gtol=1e-5, norm=Inf, eps=1e-4, maxiter=None,
-                    disp=False, return_all=False, wo_bar_vec=None, ws_vec=None, gamma=1.01, clearF=True,
-                    iter=None, alpha_k=1.0, sk_vec=None, yk_vec=None, F=None, t_vec=None, L=5,
+                    disp=False, return_all=False, wo_bar_vec=None,vo_bar_vec=None, ws_vec=None,vs_vec=None, gamma=1.01, clearF=True,
+                    iter=None, alpha_k=1.0, sk_vec=None, yk_vec=None, F=None, t_vec=None, L=5,mu_val=None,
+                    mu=None, vk_vec = None, mu_fac = 1.0, mu_clip = 0.8, mu_init = 0.1,
                     **unknown_options):
     """
     Bk = minibatch
@@ -2452,10 +2453,18 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
 
     if k == 0:
         wo_bar = np.zeros_like(wk)
+        vo_bar = np.zeros_like(wk)
         ws = np.zeros_like(wk)
+        vs = np.zeros_like(wk)
+        vk = np.zeros_like(wk)
+        mu = mu_init
     else:
         wo_bar = wo_bar_vec[0]  # np.zeros_like(wk)
+        vo_bar = vo_bar_vec[0]  # np.zeros_like(wk)
         ws = ws_vec[0]  # 0
+        vs = vs_vec[0]  # 0
+        vk = vk_vec[0]  # 0
+        mu = mu_val[0]  # 0
 
     func_calls, f = wrap_function(f, args)
     if fprime is None:
@@ -2467,6 +2476,7 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
 
     F.append(gfk)
     ws = ws + wk
+    vs = vs + vk
 
     # two loop recursion
 
@@ -2504,11 +2514,15 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
 
     flag_ret = 1
 
-    wk = wk - alpha_k * pk
+    vk = mu * vk - alpha_k * pk
+    wk = wk + vk
+    #wk = wk - alpha_k * pk
 
     if k % L == 0:
         wn_bar = ws / L
+        vn_bar = vs / L
         ws = np.zeros_like(wk)
+        vs = np.zeros_like(wk)
         if t > 0:
             if f(wn_bar) > gamma * f(wo_bar):
                 sk_vec.clear()
@@ -2516,11 +2530,14 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
                 if clearF: F.clear()
                 print("Clearing buffers")
                 wk = wo_bar
+                vk = vo_bar
+                mu = np.minimum(mu / mu_fac, mu_clip)
                 flag_ret = 0
             if flag_ret:
                 sk = wn_bar - wo_bar
                 fisher = np.asarray(F)[:, :, 0].T
                 yk = np.dot(fisher, np.dot(fisher.T, sk))
+                mu = np.minimum(mu*mu_fac,mu_clip)
                 #yk = (np.sum(fisher, 1, keepdims=True) * sk) / shape(fisher)[-1]
                 # yk = 0
                 # for i in F:
@@ -2530,8 +2547,10 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
                     sk_vec.append(sk)
                     yk_vec.append(yk)
                     wo_bar = wn_bar
+                    vo_bar = vn_bar
         else:
             wo_bar = wn_bar
+            vo_bar = vn_bar
         t += 1
         t_vec.append(t)
 
@@ -2540,7 +2559,11 @@ def _minimize_adaQN(fun, x0, args=(), jac=None, callback=None,
     k += 1
     iter.append(k)
     wo_bar_vec.append(wo_bar)  # np.zeros_like(wk)
+    vo_bar_vec.append(vo_bar)  # np.zeros_like(wk)
     ws_vec.append(ws)  # 0
+    vs_vec.append(vs)  # 0
+    vk_vec.append(vk)  # 0
+    mu_val.append(mu)  # 0
 
     result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
                             njev=0, status=0,
@@ -2689,7 +2712,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
 def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
                      gtol=1e-5, norm=Inf, eps=1e-4, maxiter=None,
-                     disp=False, return_all=False, wo_bar_vec=None, ws_vec=None, vk_vec=None, L=5,
+                     disp=False, return_all=False, wo_bar_vec=None, ws_vec=None,vo_bar_vec=None, vs_vec=None, vk_vec=None, L=5,
                      mu_val=None, mu_fac=1.01, mu_init=0.1, mu_clip=0.99, clearF=True, reset=False, dirNorm=False,
                      iter=None, alpha_k=1.0, sk_vec=None, yk_vec=None, F=None, t_vec=None, gamma=1.01, old_fun_val=None,
                      **unknown_options):
@@ -2721,13 +2744,17 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
     if k == 0:
         wo_bar = np.zeros_like(wk)
+        vo_bar = np.zeros_like(wk)
         ws = np.zeros_like(wk)
+        vs = np.zeros_like(wk)
         vk = np.zeros_like(wk)
         mu = mu_init
 
     else:
         wo_bar = wo_bar_vec[0]  # np.zeros_like(wk)
+        vo_bar = vo_bar_vec[0]  # np.zeros_like(wk)
         ws = ws_vec[0]  # 0
+        vs = vs_vec[0]  # 0
         mu = mu_val[0]  # 0
         vk = vk_vec[0]  # 0
 
@@ -2739,7 +2766,9 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
     gfk = myfprime(wk+mu*vk).reshape(-1, 1)
 
-    ws = ws + wk+mu*vk
+    ws = ws + wk#+mu*vk
+    vs = vs + vk
+
     if k==0: F.append(gfk)
     # two loop recursion
 
@@ -2785,7 +2814,9 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
 
     if k % L == 0:
         wn_bar = ws / L
+        vn_bar = ws / L
         ws = np.zeros_like(wk)
+        vs = np.zeros_like(wk)
         if t > 0:
             if f(wn_bar) > gamma * f(wo_bar):
                 sk_vec.clear()
@@ -2794,6 +2825,7 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
                 if clearF: F.clear()
                 print("Clearing buffers")
                 wk = wo_bar
+                vk = vo_bar
                 flag_ret = 0
             if flag_ret:
                 sk = wn_bar - wo_bar
@@ -2809,8 +2841,10 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
                     sk_vec.append(sk)
                     yk_vec.append(yk)
                     wo_bar = wn_bar
+                    vo_bar = vn_bar
         else:
             wo_bar = wn_bar
+            vo_bar = vn_bar
         t += 1
         t_vec.append(t)
 
@@ -2820,7 +2854,9 @@ def _minimize_adaNAQ(fun, x0, args=(), jac=None, callback=None,
     iter.append(k)
     mu_val.append(mu)
     wo_bar_vec.append(wo_bar)  # np.zeros_like(wk)
+    vo_bar_vec.append(vo_bar)  # np.zeros_like(wk)
     ws_vec.append(ws)  # 0
+    vs_vec.append(vs)  # 0
     vk_vec.append(vk)  # 0
 
     result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
