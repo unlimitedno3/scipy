@@ -1011,6 +1011,256 @@ def _minimize_olnaq(fun, x0, args=(), jac=None, callback=None,
 
     return result
 
+def _outloop_svrg(fun, x0, args=(), jac=None, callback=None,
+                   gtol=1e-6, norm=Inf, eps=_epsilon, maxiter=None,
+                   disp=False, return_all=False,
+                   omega_vec=None,wt_vec=None,
+                   dirNorm=True,
+                   **unknown_options):
+
+    _check_unknown_options(unknown_options)
+    f = fun
+    fprime = jac
+    epsilon = eps
+    retall = return_all
+    if fprime is None:
+        grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
+    else:
+        grad_calls, myfprime = wrap_function(fprime, args)
+
+    xk = asarray(x0).flatten()
+    xk = xk.reshape(-1, 1)
+    gk = myfprime(xk).reshape(-1, 1)
+    omega_vec.append(gk)
+    wt_vec.append(xk)
+    xkp1 = xk
+
+    if callback is not None:
+        callback(xk)
+    result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
+                            njev=0, status=0,
+                            success=(0), message=0, x=xkp1,
+                            nit=0)
+    return result
+
+def _minimize_svrg_1st(fun, x0, args=(), jac=None, callback=None,
+                       gtol=1e-6, norm=Inf, eps=_epsilon, maxiter=None,
+                       disp=False, return_all=False,
+                       omega_vec=None,wt_vec=None,alpha_k=None,
+                       dirNorm=True,
+                       **unknown_options):
+
+    _check_unknown_options(unknown_options)
+    f = fun
+    fprime = jac
+    epsilon = eps
+    retall = return_all
+    if fprime is None:
+        grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
+    else:
+        grad_calls, myfprime = wrap_function(fprime, args)
+
+    xk = asarray(x0).flatten()
+    xk = xk.reshape(-1, 1)
+
+    omega = asarray(omega_vec).flatten()
+    omega = omega.reshape(-1, 1)#Full Gradient
+
+    wt = asarray(wt_vec).flatten()
+    wt = wt.reshape(-1, 1)
+
+    gk = myfprime(xk).reshape(-1,1)
+    gw = myfprime(wt).reshape(-1,1)
+
+    pk = gk - gw + omega
+    vkp1 = alpha_k * pk
+    xkp1 = xk - vkp1
+
+
+
+    if callback is not None:
+        callback(xk)
+    result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
+                            njev=0, status=0,
+                            success=(0), message=0, x=xkp1,
+                            nit=0)
+    return result
+
+def _outloop_svr_naq(fun, x0, args=(), jac=None, callback=None,
+                   gtol=1e-6, norm=Inf, eps=_epsilon, maxiter=None,
+                   disp=False, return_all=False,
+                   omega_vec=None,wt_vec=None,sk_vec=None,yk_vec=None,vk_vec=None,mom=None,
+                   dirNorm=True,
+                   **unknown_options):
+
+    _check_unknown_options(unknown_options)
+    f = fun
+    fprime = jac
+    epsilon = eps
+    retall = return_all
+    if fprime is None:
+        grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
+    else:
+        grad_calls, myfprime = wrap_function(fprime, args)
+
+    xk = asarray(x0).flatten()
+    xk = xk.reshape(-1, 1)
+
+    # vk の0ベクトル生成
+    if len(vk_vec) == 0:
+        vk = np.zeros_like(xk)
+    else:
+        vk = asarray(vk_vec).flatten()
+        vk = vk.reshape(-1, 1)
+
+    omega = myfprime(xk).reshape(-1, 1)
+    omega_vec.append(omega)
+
+    wt = asarray(wt_vec).flatten()
+    wt = wt.reshape(-1, 1)
+
+    V = vk
+
+    wt_1 = wt
+    n_params = wt_1 + mom * V
+
+    n_grads = myfprime(n_params).reshape(-1,1)
+
+    wt = xk
+    wt_vec.append(wt)
+
+    st = wt - n_params
+    yt = omega - n_grads
+
+    g_norm = np.amax(np.abs(n_grads))
+    s_y = np.dot(st.T, yt)
+    if g_norm > 1e-2:
+        const = 2.0
+    else:
+        const = 100.0
+    if s_y < 0:
+        s_s = np.dot(st.T, st)
+        zeta = const - (s_y / (s_s * g_norm))
+    else:
+        zeta = const
+    yt = yt + zeta * g_norm * st
+
+    yk_vec.append(yt)
+    sk_vec.append(st)
+
+    xkp1 = xk
+
+    if callback is not None:
+        callback(xk)
+    result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
+                            njev=0, status=0,
+                            success=(0), message=0, x=xkp1,
+                            nit=0)
+    return result
+
+def _minimize_svr_naq(fun, x0, args=(), jac=None, callback=None,
+                   gtol=1e-6, norm=Inf, eps=_epsilon, maxiter=None,
+                   disp=False, return_all=False,
+                   alpha_k=None, omega_vec=None,wt_vec=None,
+                   m=None, c=None, sk_vec=None, yk_vec=None,
+                   mom=None, vk_vec=None,H_vec=None,
+                   dirNorm=True,
+                   **unknown_options):
+
+    _check_unknown_options(unknown_options)
+    f = fun
+    fprime = jac
+    epsilon = eps
+    retall = return_all
+    if fprime is None:
+        grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
+    else:
+        grad_calls, myfprime = wrap_function(fprime, args)
+
+    x0 = asarray(x0).flatten()
+    xk = x0.reshape(-1, 1)
+    k_iter = len(sk_vec)
+    mem = m[0]
+
+    # vk の0ベクトル生成
+    if len(vk_vec) == 0:
+        vk = np.zeros_like(xk)
+    else:
+        vk = asarray(vk_vec).flatten()
+        vk = vk.reshape(-1, 1)
+
+    # setting full_grads and w_wave
+    omega = asarray(omega_vec).flatten()
+    omega = omega.reshape(-1, 1)  # Full Gradient
+
+    wt = asarray(wt_vec).flatten()
+    wt = wt.reshape(-1, 1)
+
+    # getting grads
+    gk = myfprime(xk + mom * vk).reshape(-1, 1)
+    gw = myfprime(wt).reshape(-1, 1)
+
+    pk = gk - gw + omega
+
+    sk_1 = sk_vec[min(k_iter - 1, mem)]
+    yk_1 = yk_vec[min(k_iter - 1, mem)]
+
+    if c[0] == 1:
+        #lmited memory BFGS
+        # compute H
+        H = np.dot(sk_1.T, yk_1) / np.dot(yk_1.T, yk_1)
+
+        # two loop recursive
+        a = []
+        idx = min(k_iter, mem)
+        for i in range(min(k_iter, mem)):
+            a.append(numpy.dot(sk_vec[idx - 1 - i].T, pk) / numpy.dot(sk_vec[idx - 1 - i].T, yk_vec[idx - 1 - i]))
+            pk = pk - a[i] * yk_vec[idx - 1 - i]
+
+        term = 0
+        for i in range(min(k_iter, mem)):
+            term = term + (numpy.dot(sk_vec[idx - 1 - i].T, yk_vec[idx - 1 - i]) / numpy.dot(yk_vec[idx - 1 - i].T,
+                                                                                             yk_vec[idx - 1 - i]))
+        pk = pk * term / idx
+
+        for i in reversed(range(min(k_iter, mem))):
+            b = numpy.dot(yk_vec[idx - 1 - i].T, pk) / numpy.dot(yk_vec[idx - 1 - i].T, sk_vec[idx - 1 - i])
+            pk = pk + (a[i] - b) * sk_vec[idx - 1 - i]
+        rk = pk
+
+        vkp1 = mom * vk - alpha_k * rk
+    else :
+        # BFGS
+        if len(H_vec) == 0:
+            H = np.eye(len(xk))
+        else:
+            H = asarray(H_vec).reshape(-1,len(xk))
+
+        a_dot = np.dot(H,yk_1)
+        b_dot = np.dot(yk_1.T, H)
+        c_dot = np.dot(sk_1.T, yk_1)
+        d_dot = np.dot(sk_1,sk_1.T)
+
+        e_dot = (np.dot(a_dot, sk_1.T) + np.dot(sk_1, a_dot.T)) / c_dot
+        f_dot = (1 + np.dot(b_dot, yk_1)/c_dot) * d_dot/c_dot
+
+        H = H - e_dot + f_dot
+
+        H_vec.append(H)
+        vkp1 = mom * vk - alpha_k * np.dot(H, pk)
+
+
+
+    vk_vec.append(vkp1)
+    xkp1 = xk + vkp1
+
+    result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
+                            njev=0, status=0,
+                            success=(0), message=0, x=xkp1,
+                            nit=0)
+
+    return result
+
 
 def _minimize_svrg_lnaq(fun, x0, args=(), jac=None, callback=None,
                    gtol=1e-6, norm=Inf, eps=_epsilon, maxiter=None,
@@ -1079,7 +1329,27 @@ def _minimize_svrg_lnaq(fun, x0, args=(), jac=None, callback=None,
         b = numpy.dot(yk_vec[idx - 1 - i].T, pk) / numpy.dot(yk_vec[idx - 1 - i].T, sk_vec[idx - 1 - i])
         pk = pk + (a[i] - b) * sk_vec[idx - 1 - i]
     rk =  pk
-    vkp1 = mom * vk - alpha_k[0] * rk
+    '''
+    #Armijo
+    eta = 1e-3
+    fc = [0]
+    alphak = 1.0
+    fval = f(pk)
+    fc[0] += 1
+    deltaE_times_pk = np.dot(pk.T, -rk)
+    found = None
+    for i in range(10):
+        rhs = fval + eta * alphak * deltaE_times_pk
+        lhs = f(xk + alphak * pk)
+        fc[0] += 1
+        if lhs <= rhs:
+            found = 1
+            break
+        alphak = alphak / 2
+    alpha_k = alphak
+    '''
+
+    vkp1 = mom * vk - alpha_k * rk
     vk_vec.append(vkp1)
     xkp1 = xk + vkp1
 
@@ -3506,8 +3776,12 @@ def show_options(solver=None, method=None, disp=True):
             ('bfgs', 'scipy.optimize.optimize._minimize_bfgs'),
             ('onaq', 'scipy.optimize.optimize._minimize_onaq'),
             ('svrg', 'scipy.optimize.optimize._minimize_svrg'),
+            ('svrg_1st', 'scipy.optimize.optimize._minimize_svrg_1st'),
+            ('out_svrg', 'scipy.optimize.optimize._outloop_svrg'),
+            ('out_svr_naq', 'scipy.optimize.optimize._outloop_svr_naq'),
             ('svrg_2', 'scipy.optimize.optimize._minimize_svrg_2'),
             ('svrg_lnaq', 'scipy.optimize.optimize._minimize_svrg_lnaq'),
+            ('svr_naq', 'scipy.optimize.optimize._minimize_svrg_lnaq'),
             ('olnaq', 'scipy.optimize.optimize._minimize_olnaq'),
             ('olbfgs', 'scipy.optimize.optimize._minimize_olbfgs'),
             ('cg', 'scipy.optimize.optimize._minimize_cg'),
