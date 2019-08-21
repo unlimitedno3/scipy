@@ -19,7 +19,9 @@ import numpy as np
 from scipy._lib.six import callable
 
 # unconstrained minimization
-from .optimize import (_minimize_olbfgs,_minimize_olnaq, _minimize_svrg_lnaq,_minimize_svrg_2,_minimize_svrg,_minimize_onaq, _minimize_neldermead, _minimize_powell, _minimize_cg,
+from .optimize import (_outloop_svrg,_minimize_svrg_1st,_outloop_svr_naq,_minimize_olbfgs,_minimize_olnaq, _minimize_svr_naq,
+                       _minimize_svrg_lnaq,_minimize_svrg_2,_minimize_svrg,_minimize_onaq, _minimize_neldermead,
+                       _minimize_powell, _minimize_cg,
                        _minimize_bfgs, _minimize_newtoncg,
                        _minimize_scalar_brent, _minimize_scalar_bounded,
                        _minimize_scalar_golden, MemoizeJac)
@@ -589,12 +591,20 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
         return _minimize_svrg_2(fun, x0, args, jac, callback, **options)
     elif meth == 'svrg_lnaq':
         return _minimize_svrg_lnaq(fun, x0, args, jac, callback, **options)
+    elif meth == 'svr_naq':
+        return _minimize_svr_naq(fun, x0, args, jac, callback, **options)
+    elif meth == 'out_svr_naq':
+        return _outloop_svr_naq(fun, x0, args, jac, callback, **options)
+    elif meth == 'out_svrg':
+        return _outloop_svrg(fun, x0, args, jac, callback, **options)
     elif meth == 'olnaq':
         return _minimize_olnaq(fun, x0, args, jac, callback, **options)
     elif meth == 'olbfgs':
         return _minimize_olbfgs(fun, x0, args, jac, callback, **options)
     elif meth == 'svrg':
         return _minimize_svrg(fun, x0, args, jac, callback, **options)
+    elif meth == 'svrg_1st':
+        return _minimize_svrg_1st(fun, x0, args, jac, callback, **options)
     elif meth == 'onaq':
         return _minimize_onaq(fun, x0, args, jac, callback, **options)
     elif meth == 'nelder-mead':
