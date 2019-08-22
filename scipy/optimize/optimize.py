@@ -924,7 +924,7 @@ def _minimize_olbfgs(fun, x0, args=(), jac=None, callback=None,
 
 def _minimize_olnaq(fun, x0, args=(), jac=None, callback=None,
                     gtol=1e-5, norm=Inf, eps=_epsilon, maxiter=None,
-                    disp=False, return_all=False, vk_vec=None, sk_vec=None, yk_vec=None, m=8, alpha_k=None, mu=None,
+                    disp=False, return_all=False, vk_vec=None, sk_vec=None, yk_vec=None, m=8, alpha_k=1.0, mu=None,
                     dirNorm=True,
                     **unknown_options):
     '''
@@ -952,19 +952,20 @@ def _minimize_olnaq(fun, x0, args=(), jac=None, callback=None,
     retall = return_all
 
     xk = asarray(x0).flatten()
-    xk = xk.reshape(-1, 1)
     func_calls, f = wrap_function(f, args)
     if fprime is None:
         grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
     else:
         grad_calls, myfprime = wrap_function(fprime, args)
-    vk = asarray(vk_vec).flatten()
-    vk = vk.reshape(-1, 1)
-    alpha = asarray(alpha_k).flatten()
-    alpha = alpha.reshape(-1, 1)
-    k = len(sk_vec)
 
-    gfk = myfprime(xk + mu * vk).reshape(-1, 1)
+    k = len(sk_vec)
+    if k ==0:
+        print("Parameters: ",len(xk))
+        vk_vec.append(np.zeros_like(xk))
+
+    vk = vk_vec[0]
+
+    gfk = myfprime(xk + mu * vk)
     pk = -gfk
     a = []
     idx = min(k, m)
@@ -986,16 +987,13 @@ def _minimize_olnaq(fun, x0, args=(), jac=None, callback=None,
     if dirNorm == True:
         pk = pk / vecnorm(pk, 2)  # direction normalization
 
-    pk = pk.reshape(-1, 1)
-    vkp1 = mu * vk + alpha * pk
+    vkp1 = mu * vk + alpha_k[0] * pk
     xkp1 = xk + vkp1
     sk = xkp1 - (xk + mu * vk)
     vk_vec.append(vkp1)
     sk_vec.append(sk)
 
     gfkp1 = myfprime(xkp1)
-    gfkp1 = gfkp1.reshape(-1, 1)
-    gfk = gfk.reshape(-1, 1)
     yk = gfkp1 - gfk + sk
     yk_vec.append(yk)
     xk = xkp1
@@ -1010,6 +1008,7 @@ def _minimize_olnaq(fun, x0, args=(), jac=None, callback=None,
                             nit=k)
 
     return result
+
 
 def _outloop_svrg(fun, x0, args=(), jac=None, callback=None,
                    gtol=1e-6, norm=Inf, eps=_epsilon, maxiter=None,
