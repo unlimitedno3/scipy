@@ -924,7 +924,7 @@ def _minimize_olbfgs(fun, x0, args=(), jac=None, callback=None,
 
 def _minimize_olnaq(fun, x0, args=(), jac=None, callback=None,
                     gtol=1e-5, norm=Inf, eps=_epsilon, maxiter=None,
-                    disp=False, return_all=False, vk_vec=None, sk_vec=None, yk_vec=None, m=8, alpha_k=1.0, mu=None,
+                    disp=False, return_all=False, vk_vec=None, sk_vec=None, yk_vec=None, m=8, alpha_k=1.0, muP=None,
                     dirNorm=True,
                     **unknown_options):
     '''
@@ -950,7 +950,7 @@ def _minimize_olnaq(fun, x0, args=(), jac=None, callback=None,
     fprime = jac
     epsilon = eps
     retall = return_all
-
+    mu = muP[0]
     xk = asarray(x0).flatten()
     func_calls, f = wrap_function(f, args)
     if fprime is None:
@@ -1088,7 +1088,7 @@ def _minimize_svrg_1st(fun, x0, args=(), jac=None, callback=None,
 def _outloop_svr_naq(fun, x0, args=(), jac=None, callback=None,
                    gtol=1e-6, norm=Inf, eps=_epsilon, maxiter=None,
                    disp=False, return_all=False,
-                   omega_vec=None,wt_vec=None,sk_vec=None,yk_vec=None,vk_vec=None,mom=None,
+                   omega_vec=None,wt_vec=None,sk_vec=None,yk_vec=None,vk_vec=None,muP=None,
                    dirNorm=True,
                    **unknown_options):
 
@@ -1104,7 +1104,7 @@ def _outloop_svr_naq(fun, x0, args=(), jac=None, callback=None,
 
     xk = asarray(x0).flatten()
     xk = xk.reshape(-1, 1)
-
+    mom = muP[0]
     # vk の0ベクトル生成
     if len(vk_vec) == 0:
         vk = np.zeros_like(xk)
@@ -1162,7 +1162,7 @@ def _minimize_svr_naq(fun, x0, args=(), jac=None, callback=None,
                    disp=False, return_all=False,
                    alpha_k=None, omega_vec=None,wt_vec=None,
                    m=None, c=None, sk_vec=None, yk_vec=None,
-                   mom=None, vk_vec=None,H_vec=None,
+                   muP=None, vk_vec=None,H_vec=None,
                    dirNorm=True,
                    **unknown_options):
 
@@ -1180,6 +1180,7 @@ def _minimize_svr_naq(fun, x0, args=(), jac=None, callback=None,
     xk = x0.reshape(-1, 1)
     k_iter = len(sk_vec)
     mem = m[0]
+    mom = muP[0]
 
     # vk の0ベクトル生成
     if len(vk_vec) == 0:
@@ -1201,7 +1202,7 @@ def _minimize_svr_naq(fun, x0, args=(), jac=None, callback=None,
 
     pk = gk - gw + omega
 
-    sk_1 = sk_vec[min(k_iter - 1, mem)]
+    sk_1 = sk_vec[min(k_iter - 1, mem)]#sk_vec[-1]
     yk_1 = yk_vec[min(k_iter - 1, mem)]
 
     if c[0] == 1:
