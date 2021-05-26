@@ -1009,6 +1009,202 @@ def _minimize_olnaq(fun, x0, args=(), jac=None, callback=None,
 
     return result
 
+def _lookahead_olnaq(fun, x0, args=(), jac=None, callback=None,
+                    gtol=1e-5, norm=Inf, eps=_epsilon, maxiter=None,
+                    disp=False, return_all=False, vk_vec=None, sk_vec=None, yk_vec=None, m=None, alpha_k=None, muP=None,
+                    alpha_slow=0.8, slow_w_save=None,
+                    dirNorm=True,
+                    **unknown_options):
+    '''
+    Minimization of scalar function of one or more variables using the
+    BFGS algorithm.
+    Options
+    -------
+    disp : bool
+        Set to True to print convergence messages.
+    maxiter : int
+        Maximum number of iterations to perform.
+    gtol : float
+        Gradient norm must be less than `gtol` before successful
+        termination.
+    norm : float
+        Order of norm (Inf is max, -Inf is min).
+    eps : float or ndarray
+        If `jac` is approximated, use this value for the step size.
+    '''
+
+    '''
+    
+    '''
+
+    _check_unknown_options(unknown_options)
+    f = fun
+    fprime = jac
+    epsilon = eps
+    retall = return_all
+    func_calls, f = wrap_function(f, args)
+    if fprime is None:
+        grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
+    else:
+        grad_calls, myfprime = wrap_function(fprime, args)
+
+    '''
+    x0,xk,xkp1:重み
+    myfprime():勾配計算
+    slow_w:低速の重み
+    fast_w:高速の重み
+
+    # パラメータの整形
+    xk = asarray(x0).flatten()
+
+    #パラメータ数表示
+    k = len(slow_w_save)
+    if k ==0:
+        print("Parameters: ",len(xk))
+        slow_w_save.append(xk)
+
+
+    else:
+        #高速の重みに重みを代入
+        fast_w = xk
+        fast_w = fast_w.reshape(-1, 1)
+
+        #低速の重みを更新
+        slow_w = asarray(slow_w_save).flatten()
+        slow_w = slow_w.reshape(-1, 1)
+        slow_w = slow_w + alpha_k * (fast_w - slow_w)
+
+        #高速の重みに代入
+        fast_w = slow_w
+        xk = fast_w
+        slow_w_save.append(xk)
+
+    if callback is not None:
+        callback(xk)
+    k += 1
+    '''
+
+    mu = muP
+    xk = asarray(x0).flatten()
+
+
+    k = len(sk_vec)
+    if k ==0:
+        print("Parameters: ",len(xk))
+        vk_vec.append(np.zeros_like(xk))
+
+    vk = vk_vec[0]
+
+    gfk = myfprime(xk + mu * vk)
+
+
+    pk = -gfk
+    a = []
+    idx = min(k, m)
+    for i in range(min(k, m)):
+        a.append(numpy.dot(sk_vec[idx - 1 - i].T, pk) / numpy.dot(sk_vec[idx - 1 - i].T, yk_vec[idx - 1 - i]))
+        pk = pk - a[i] * yk_vec[idx - 1 - i]
+    if k > 0:
+        term = 0
+        for i in range(min(k, m)):
+            term = term + (numpy.dot(sk_vec[idx - 1 - i].T, yk_vec[idx - 1 - i]) / numpy.dot(yk_vec[idx - 1 - i].T,
+                                                                                             yk_vec[idx - 1 - i]))
+        pk = pk * term / idx
+    else:
+        pk = 1e-10 * pk
+    for i in reversed(range(min(k, m))):
+        b = numpy.dot(yk_vec[idx - 1 - i].T, pk) / numpy.dot(yk_vec[idx - 1 - i].T, sk_vec[idx - 1 - i])
+        pk = pk + (a[i] - b) * sk_vec[idx - 1 - i]
+
+
+
+    if dirNorm == True:
+        pk = pk / vecnorm(pk, 2)  # direction normalization
+
+    vkp1 = mu * vk + alpha_k[0] * pk
+    xkp1 = xk + vkp1
+    sk = xkp1 - (xk + mu * vk)
+    vk_vec.append(vkp1)
+    sk_vec.append(sk)
+
+    gfkp1 = myfprime(xkp1)
+    yk = gfkp1 - gfk + sk
+    yk_vec.append(yk)
+    xk = xkp1
+
+
+    if callback is not None:
+        callback(xk)
+    k += 1
+
+
+    result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
+                            njev=0, status=0,
+                            success=(0), message=0, x=xkp1,
+                            nit=k)
+
+    return result
+
+
+def _outloop_lookahead(fun, x0, args=(), jac=None, callback=None,
+                    gtol=1e-5, norm=Inf, eps=_epsilon, maxiter=None,
+                    disp=False, return_all=False,
+                    alpha_k=0.8, slow_w_save=None,
+                    dirNorm=True,
+                    **unknown_options):
+
+    _check_unknown_options(unknown_options)
+    f = fun
+    fprime = jac
+    epsilon = eps
+    retall = return_all
+    func_calls, f = wrap_function(f, args)
+    if fprime is None:
+        grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
+    else:
+        grad_calls, myfprime = wrap_function(fprime, args)
+    '''
+    x0,xk,xkp1:重み
+    myfprime():勾配計算
+    slow_w:低速の重み
+    fast_w:高速の重み
+    '''
+    # パラメータの整形
+    xk = asarray(x0).flatten()
+
+    #パラメータ数表示
+    k = len(slow_w_save)
+    if k ==0:
+        print("Parameters: ",len(xk))
+        slow_w_save.append(xk)
+
+
+    else:
+        #高速の重みに重みを代入
+        fast_w = xk
+        fast_w = fast_w.reshape(-1, 1)
+
+        #低速の重みを更新
+        slow_w = asarray(slow_w_save).flatten()
+        slow_w = slow_w.reshape(-1, 1)
+        slow_w = slow_w + alpha_k * (fast_w - slow_w)
+
+        #高速の重みに代入
+        fast_w = slow_w
+        xk = fast_w
+        slow_w_save.append(xk)
+
+    if callback is not None:
+        callback(xk)
+    k += 1
+
+
+    result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
+                            njev=0, status=0,
+                            success=(0), message=0, x=xk,
+                            nit=k)
+
+    return result
 
 def _outloop_svrg(fun, x0, args=(), jac=None, callback=None,
                    gtol=1e-6, norm=Inf, eps=_epsilon, maxiter=None,
@@ -1033,6 +1229,56 @@ def _outloop_svrg(fun, x0, args=(), jac=None, callback=None,
     omega_vec.append(gk)
     wt_vec.append(xk)
     xkp1 = xk
+
+    if callback is not None:
+        callback(xk)
+    result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
+                            njev=0, status=0,
+                            success=(0), message=0, x=xkp1,
+                            nit=0)
+    return result
+
+def _minimize_svrnag(fun, x0, args=(), jac=None, callback=None,
+                       gtol=1e-6, norm=Inf, eps=_epsilon, maxiter=None,
+                       disp=False, return_all=False,
+                       omega_vec=None,wt_vec=None,vk_vec=None,alpha_k=None,muP=None,
+                       dirNorm=True,
+                       **unknown_options):
+
+    _check_unknown_options(unknown_options)
+    f = fun
+    fprime = jac
+    epsilon = eps
+    retall = return_all
+    if fprime is None:
+        grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
+    else:
+        grad_calls, myfprime = wrap_function(fprime, args)
+
+    # vk の0ベクトル生成
+    if len(vk_vec) == 0:
+        vk = np.zeros_like(xk)
+    else:
+        vk = asarray(vk_vec).flatten()
+        vk = vk.reshape(-1, 1)
+
+    xk = asarray(x0).flatten()
+    xk = xk.reshape(-1, 1)
+
+    omega = asarray(omega_vec).flatten()
+    omega = omega.reshape(-1, 1)#Full Gradient
+
+    wt = asarray(wt_vec).flatten()
+    wt = wt.reshape(-1, 1)
+
+    gk = myfprime(xk).reshape(-1,1)
+    gw = myfprime(wt).reshape(-1,1)
+
+    pk = gk - gw + omega
+    vkp1 = alpha_k * pk
+    xkp1 = xk + muP*vt_vec - vkp1
+
+
 
     if callback is not None:
         callback(xk)
@@ -1157,12 +1403,134 @@ def _outloop_svr_naq(fun, x0, args=(), jac=None, callback=None,
                             nit=0)
     return result
 
+def _outloop_add_hessian(fun, x0, args=(), jac=None, callback=None,
+                   gtol=1e-6, norm=Inf, eps=_epsilon, maxiter=None,
+                   disp=False, return_all=False,
+                   omega_vec=None,wt_vec=None,
+                   sk_vec=None,yk_vec=None,xP_vec=None,
+                   dirNorm=True,
+                   **unknown_options):
+
+    _check_unknown_options(unknown_options)
+    f = fun
+    fprime = jac
+    epsilon = eps
+    retall = return_all
+    if fprime is None:
+        grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
+    else:
+        grad_calls, myfprime = wrap_function(fprime, args)
+
+    xk = asarray(x0).flatten()
+    xk = xk.reshape(-1, 1)
+
+    omega = myfprime(xk).reshape(-1, 1)
+    omega_vec.append(omega)
+
+    wt = asarray(wt_vec).flatten()
+    wt = wt.reshape(-1, 1)
+
+    n_params = wt
+    n_grads = myfprime(n_params).reshape(-1,1)
+
+    wt = xk
+    wt_vec.append(wt)
+    xP_vec.append(wt)
+
+    st = wt - n_params
+    yt = omega - n_grads
+
+    g_norm = np.amax(np.abs(n_grads))
+    s_y = np.dot(st.T, yt)
+    if g_norm > 1e-2:
+        const = 2.0
+    else:
+        const = 100.0
+    if s_y < 0:
+        s_s = np.dot(st.T, st)
+        zeta = const - (s_y / (s_s * g_norm))
+    else:
+        zeta = const
+    yt = yt + zeta * g_norm * st
+
+    yk_vec.append(yt)
+    sk_vec.append(st)
+
+    xkp1 = xk
+
+    if callback is not None:
+        callback(xk)
+    result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
+                            njev=0, status=0,
+                            success=(0), message=0, x=xkp1,
+                            nit=0)
+    return result
+
+def _minimize_add_hessian(fun, x0, args=(), jac=None, callback=None,
+                   gtol=1e-6, norm=Inf, eps=_epsilon, maxiter=None,
+                   disp=False, return_all=False,
+                   m=None, c=None,
+                   sk_vec=None, yk_vec=None,xP_vec=None,
+                   dirNorm=True,
+                   **unknown_options):
+    _check_unknown_options(unknown_options)
+    f = fun
+    fprime = jac
+    epsilon = eps
+    retall = return_all
+    if fprime is None:
+        grad_calls, myfprime = wrap_function(approx_fprime, (f, epsilon))
+    else:
+        grad_calls, myfprime = wrap_function(fprime, args)
+
+    x0 = asarray(x0).flatten()
+    xk = x0.reshape(-1, 1)
+    k_iter = len(sk_vec)
+    mem = m[0]
+
+    xP = asarray(xP_vec).flatten()
+    xP = xP.reshape(-1, 1)
+
+    vk = xk - xP
+    pk = vk
+
+    sk_1 = sk_vec[min(k_iter - 1, mem)]  # sk_vec[-1]
+    yk_1 = yk_vec[min(k_iter - 1, mem)]
+
+    # two loop recursive
+    a = []
+    idx = min(k_iter, mem)
+    for i in range(min(k_iter, mem)):
+        a.append(numpy.dot(sk_vec[idx - 1 - i].T, pk) / numpy.dot(sk_vec[idx - 1 - i].T, yk_vec[idx - 1 - i]))
+        pk = pk - a[i] * yk_vec[idx - 1 - i]
+
+    term = 0
+    for i in range(min(k_iter, mem)):
+        term = term + (numpy.dot(sk_vec[idx - 1 - i].T, yk_vec[idx - 1 - i]) / numpy.dot(yk_vec[idx - 1 - i].T,
+                                                                                         yk_vec[idx - 1 - i]))
+    pk = pk * term / idx
+
+    for i in reversed(range(min(k_iter, mem))):
+        b = numpy.dot(yk_vec[idx - 1 - i].T, pk) / numpy.dot(yk_vec[idx - 1 - i].T, sk_vec[idx - 1 - i])
+        pk = pk + (a[i] - b) * sk_vec[idx - 1 - i]
+    rk = pk
+
+    xkp1 = xk + rk
+    xP_vec.append(xkp1)
+
+    result = OptimizeResult(fun=0, jac=0, hess_inv=0, nfev=0,
+                            njev=0, status=0,
+                            success=(0), message=0, x=xkp1,
+                            nit=0)
+    return result
+
+
 def _minimize_svr_naq(fun, x0, args=(), jac=None, callback=None,
                    gtol=1e-6, norm=Inf, eps=_epsilon, maxiter=None,
                    disp=False, return_all=False,
                    alpha_k=None, omega_vec=None,wt_vec=None,
                    m=None, c=None, sk_vec=None, yk_vec=None,
-                   muP=None, vk_vec=None,H_vec=None,
+                   muP=None, vk_vec=None,H_vec=None,save_norm=None,
                    dirNorm=True,
                    **unknown_options):
 
@@ -1201,6 +1569,12 @@ def _minimize_svr_naq(fun, x0, args=(), jac=None, callback=None,
     gw = myfprime(wt).reshape(-1, 1)
 
     pk = gk - gw + omega
+
+    '''
+    save |pk|
+    '''
+    g_norm = np.amax(np.abs(pk))
+    save_norm.append(g_norm)
 
     sk_1 = sk_vec[min(k_iter - 1, mem)]#sk_vec[-1]
     yk_1 = yk_vec[min(k_iter - 1, mem)]
@@ -3778,11 +4152,15 @@ def show_options(solver=None, method=None, disp=True):
             ('svrg', 'scipy.optimize.optimize._minimize_svrg'),
             ('svrg_1st', 'scipy.optimize.optimize._minimize_svrg_1st'),
             ('out_svrg', 'scipy.optimize.optimize._outloop_svrg'),
+            ('add_hessian', 'scipy.optimize.optimize._minimize_add_hessian'),
+            ('out_add_hessian', 'scipy.optimize.optimize._outloop_add_hessian'),
             ('out_svr_naq', 'scipy.optimize.optimize._outloop_svr_naq'),
             ('svrg_2', 'scipy.optimize.optimize._minimize_svrg_2'),
             ('svrg_lnaq', 'scipy.optimize.optimize._minimize_svrg_lnaq'),
             ('svr_naq', 'scipy.optimize.optimize._minimize_svrg_lnaq'),
             ('olnaq', 'scipy.optimize.optimize._minimize_olnaq'),
+            ('outloop_lookahead', 'scipy.optimize.optimize._outloop_lookahead'),
+            ('lookahead_olnaq', 'scipy.optimize.optimize._lookahead_olnaq'),
             ('olbfgs', 'scipy.optimize.optimize._minimize_olbfgs'),
             ('cg', 'scipy.optimize.optimize._minimize_cg'),
             ('cobyla', 'scipy.optimize.cobyla._minimize_cobyla'),
