@@ -19,7 +19,7 @@ import numpy as np
 from scipy._lib.six import callable
 
 # unconstrained minimization
-from .optimize import (_outloop_svrg,_minimize_svrg_1st,_outloop_svr_naq,_minimize_olbfgs,_minimize_olnaq, _minimize_svr_naq,
+from .optimize import (_outloop_add_hessian,_minimize_add_hessian,_minimize_svrnag,_outloop_svrg,_minimize_svrg_1st,_outloop_svr_naq,_minimize_olbfgs,_minimize_olnaq,_outloop_lookahead,_lookahead_olnaq, _minimize_svr_naq,
                        _minimize_svrg_lnaq,_minimize_svrg_2,_minimize_svrg,_minimize_onaq, _minimize_neldermead,
                        _minimize_powell, _minimize_cg,
                        _minimize_bfgs, _minimize_newtoncg,
@@ -587,6 +587,10 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
         return method(fun, x0, args=args, jac=jac, hess=hess, hessp=hessp,
                       bounds=bounds, constraints=constraints,
                       callback=callback, **options)
+    elif meth == 'add_hessian':
+        return _minimize_add_hessian(fun, x0, args, jac, callback, **options)
+    elif meth == 'out_add_hessian':
+        return _outloop_add_hessian(fun, x0, args, jac, callback, **options)
     elif meth == 'svrg_2':
         return _minimize_svrg_2(fun, x0, args, jac, callback, **options)
     elif meth == 'svrg_lnaq':
@@ -597,8 +601,14 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
         return _outloop_svr_naq(fun, x0, args, jac, callback, **options)
     elif meth == 'out_svrg':
         return _outloop_svrg(fun, x0, args, jac, callback, **options)
+    elif meth == 'svrnag':
+        return _minimize_svrnag(fun, x0, args, jac, callback, **options)
     elif meth == 'olnaq':
         return _minimize_olnaq(fun, x0, args, jac, callback, **options)
+    elif meth == 'lookahead_olnaq':
+        return _lookahead_olnaq(fun, x0, args, jac, callback, **options)
+    elif meth == 'outloop_lookahead':
+        return _outloop_lookahead(fun, x0, args, jac, callback, **options)
     elif meth == 'olbfgs':
         return _minimize_olbfgs(fun, x0, args, jac, callback, **options)
     elif meth == 'svrg':
